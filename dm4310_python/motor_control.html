@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DM4310 云台相机</title>
+  <style>
+    :root {
+      --ink: #e8eadf;
+      --muted: #8e948b;
+      --panel: #111512;
+      --panel-2: #171c18;
+      --line: #303831;
+      --acid: #c8ff32;
+      --acid-dim: rgba(200, 255, 50, .16);
+      --amber: #ffb547;
+      --red: #ff4d3f;
+      --blue: #62b7ff;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .45);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 70% 18%, rgba(200,255,50,.07), transparent 30%),
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        #090c0a;
+      background-size: auto, 28px 28px, 28px 28px, auto;
+      font-family: Bahnschrift, "Microsoft YaHei UI", sans-serif;
+      letter-spacing: .02em;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .045;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+      mix-blend-mode: screen;
+    }
+
+    button, input { font: inherit; }
+
+    .shell {
+      width: min(1460px, calc(100vw - 40px));
+      margin: 20px auto;
+      min-height: calc(100vh - 40px);
+      border: 1px solid var(--line);
+      background: rgba(12, 16, 13, .94);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .shell::after {
+      content: "DM—4310 / LOCAL CONTROL";
+      position: absolute;
+      right: -26px;
+      top: 160px;
+      writing-mode: vertical-rl;
+      font-size: 72px;
+      line-height: .8;
+      color: rgba(255,255,255,.022);
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+      background: #0d110e;
+    }
+
+    .brand { display: flex; align-items: center; gap: 15px; }
+    .brand-mark {
+      width: 38px; height: 38px;
+      display: grid; place-items: center;
+      color: #081006;
+      background: var(--acid);
+      font-weight: 900;
+      clip-path: polygon(0 0, 78% 0, 100% 22%, 100% 100%, 22% 100%, 0 78%);
+    }
+    h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: .13em; }
+    .subtitle { margin-top: 3px; color: var(--muted); font-size: 11px; letter-spacing: .18em; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 9px;
+      border: 1px solid var(--line);
+      padding: 9px 13px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      background: #111612;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 4px rgba(255,255,255,.04); }
+    .status-pill.tracking .status-dot { background: var(--acid); box-shadow: 0 0 15px var(--acid); }
+    .status-pill.homing .status-dot { background: var(--amber); box-shadow: 0 0 15px var(--amber); animation: pulse 1s infinite; }
+    .status-pill.fault .status-dot { background: var(--red); box-shadow: 0 0 15px var(--red); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(560px, 1.4fr) minmax(360px, .85fr);
+      min-height: 690px;
+    }
+
+    .control-stage {
+      padding: 28px;
+      border-right: 1px solid var(--line);
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: linear-gradient(135deg, rgba(255,255,255,.016), transparent 45%);
+    }
+
+    .section-label {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-label::before { content: ""; width: 26px; height: 1px; background: var(--acid); }
+
+    .dial-zone {
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      align-items: center;
+      gap: 30px;
+      min-height: 490px;
+    }
+
+    .dial-wrap { display: grid; place-items: center; position: relative; }
+
+    .dial {
+      --dial-size: min(42vw, 430px);
+      width: var(--dial-size);
+      height: var(--dial-size);
+      min-width: 330px;
+      min-height: 330px;
+      border-radius: 50%;
+      position: relative;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      background:
+        radial-gradient(circle at center, #111612 0 28%, transparent 28.5%),
+        repeating-conic-gradient(from -172deg, rgba(255,255,255,.62) 0 .35deg, transparent .35deg 4deg),
+        radial-gradient(circle, transparent 0 68%, rgba(200,255,50,.08) 68.5% 70%, transparent 70.5%),
+        #0b0f0c;
+      border: 1px solid #465047;
+      box-shadow: inset 0 0 0 14px #101511, inset 0 0 0 15px var(--line), 0 28px 70px rgba(0,0,0,.42);
+    }
+    .dial:active { cursor: grabbing; }
+    .dial.locked { cursor: not-allowed; filter: saturate(.35); }
+
+    .dial::before, .dial::after {
+      content: "";
+      position: absolute;
+      inset: 8%;
+      border-radius: 50%;
+      border: 1px dashed rgba(255,255,255,.15);
+      pointer-events: none;
+    }
+    .dial::after { inset: 31%; border-style: solid; border-color: var(--line); }
+
+    .needle {
+      position: absolute;
+      left: calc(50% - 2px);
+      bottom: 50%;
+      width: 4px;
+      height: 42%;
+      transform-origin: 50% 100%;
+      pointer-events: none;
+      transition: transform 70ms linear;
+    }
+    .needle::before { content: ""; position: absolute; inset: 0; background: currentColor; box-shadow: 0 0 20px currentColor; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .needle.actual { color: var(--blue); opacity: .82; height: 37%; left: calc(50% - 1px); width: 2px; }
+    .needle.target { color: var(--acid); }
+
+    .hub {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 116px; height: 116px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background: #121713;
+      border: 1px solid #3f493f;
+      box-shadow: inset 0 0 28px rgba(0,0,0,.75), 0 0 0 7px #0b0f0c;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .hub strong { display: block; color: var(--acid); font-size: 25px; font-weight: 500; letter-spacing: -.03em; }
+    .hub span { display: block; color: var(--muted); font-size: 9px; letter-spacing: .2em; margin-top: 4px; }
+
+    .zero-mark { position: absolute; top: 4%; left: 50%; transform: translateX(-50%); color: var(--acid); font-size: 9px; letter-spacing: .16em; }
+    .limit-mark { position: absolute; bottom: 9%; font-size: 10px; color: var(--muted); }
+    .limit-mark.left { left: 10%; }
+    .limit-mark.right { right: 10%; }
+
+    .angle-tools { display: flex; flex-direction: column; gap: 12px; }
+    .angle-readout { border-left: 2px solid var(--acid); padding: 8px 0 8px 14px; }
+    .angle-readout small { color: var(--muted); font-size: 10px; letter-spacing: .15em; }
+    .angle-readout b { display: block; font-size: 31px; font-weight: 400; margin-top: 3px; }
+    .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+    .btn {
+      min-height: 42px;
+      border: 1px solid #414a42;
+      color: var(--ink);
+      background: #151a16;
+      padding: 9px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 11px;
+      transition: border-color .16s, background .16s, color .16s, transform .16s;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--acid); color: var(--acid); transform: translateY(-1px); }
+    .btn:disabled { opacity: .28; cursor: not-allowed; }
+    .btn.primary { color: #091006; background: var(--acid); border-color: var(--acid); font-weight: 700; }
+    .btn.primary:hover:not(:disabled) { color: #091006; background: #dcff7a; }
+
+    .bottom-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.25fr;
+      gap: 10px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .btn.emergency {
+      background: rgba(255,77,63,.1);
+      border-color: var(--red);
+      color: #ff9289;
+      font-weight: 700;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn.emergency::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--red); }
+    .btn.emergency:hover { background: var(--red); color: white; border-color: var(--red); }
+
+    aside { display: grid; grid-template-rows: auto auto 1fr; min-width: 0; }
+    .telemetry { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+    .metric { padding: 24px 20px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-height: 116px; }
+    .metric:nth-child(2n) { border-right: 0; }
+    .metric label { display: block; color: var(--muted); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 13px; font-size: 25px; font-weight: 400; font-variant-numeric: tabular-nums; }
+    .metric strong.acid { color: var(--acid); }
+    .metric small { color: #677067; font-size: 10px; }
+
+    .tuning { padding: 22px 20px; border-bottom: 1px solid var(--line); }
+    .range-row { margin-top: 18px; }
+    .range-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; }
+    .range-head output { color: var(--ink); }
+    input[type="range"] { width: 100%; margin: 10px 0 0; accent-color: var(--acid); }
+
+    .message-panel { padding: 22px 20px; display: flex; flex-direction: column; min-height: 180px; }
+    .system-message { margin: 16px 0; padding: 15px; color: #c7cdc5; background: #0c100d; border: 1px solid var(--line); font-size: 12px; line-height: 1.55; }
+    .log { margin-top: auto; max-height: 140px; overflow: auto; color: #6f786f; font: 10px/1.7 Consolas, monospace; scrollbar-color: var(--line) transparent; }
+    .log div::before { content: "> "; color: var(--acid); }
+
+    .safety-strip {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      padding: 11px 22px;
+      border-top: 1px solid var(--line);
+      color: #777f77;
+      font-size: 10px;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .safety-strip b { color: var(--amber); font-weight: 500; }
+
+    .reveal { opacity: 0; transform: translateY(10px); animation: reveal .5s forwards; }
+    .reveal:nth-child(2) { animation-delay: .08s; }
+    .reveal:nth-child(3) { animation-delay: .16s; }
+
+    @keyframes reveal { to { opacity: 1; transform: none; } }
+    @keyframes pulse { 50% { opacity: .35; } }
+
+    @media (max-width: 1050px) {
+      main { grid-template-columns: 1fr; }
+      .control-stage { border-right: 0; border-bottom: 1px solid var(--line); }
+      .dial { --dial-size: min(60vw, 430px); }
+    }
+    @media (max-width: 700px) {
+      .shell { width: 100%; margin: 0; min-height: 100vh; }
+      header { grid-template-columns: 1fr; gap: 12px; }
+      .dial-zone { grid-template-columns: 1fr; }
+      .dial { --dial-size: min(88vw, 390px); min-width: 280px; min-height: 280px; }
+      .angle-tools { display: grid; grid-template-columns: 1fr 1fr; }
+      .bottom-controls { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark">DM</div>
+        <div>
+          <h1>DM4310 云台相机</h1>
+          <div class="subtitle">J4310 · USB2FDCAN · LOCAL LOOP 100 HZ</div>
+        </div>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot"></span>
+        <span id="statusText">DISCONNECTED</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="control-stage reveal">
+        <div class="section-label">Angular command / 拖拽目标角</div>
+        <div class="dial-zone">
+          <div class="dial-wrap">
+            <div class="dial locked" id="dial" role="slider" tabindex="0" aria-label="目标角度" aria-valuemin="-3" aria-valuemax="3" aria-valuenow="0">
+              <div class="zero-mark">ZERO / 0 RAD</div>
+              <div class="limit-mark left">−3.0</div>
+              <div class="limit-mark right">+3.0</div>
+              <div class="needle actual" id="actualNeedle"></div>
+              <div class="needle target" id="targetNeedle"></div>
+              <div class="hub"><div><strong id="hubAngle">0.000</strong><span>TARGET · RAD</span></div></div>
+            </div>
+          </div>
+
+          <div class="angle-tools">
+            <div class="angle-readout"><small>ACTUAL POSITION</small><b id="actualAngle">—</b></div>
+            <div class="preset-grid">
+              <button class="btn preset" data-angle="-1.5708">−90°</button>
+              <button class="btn preset" data-angle="1.5708">+90°</button>
+              <button class="btn preset" data-angle="-0.7854">−45°</button>
+              <button class="btn preset" data-angle="0.7854">+45°</button>
+            </div>
+            <button class="btn primary preset" data-angle="0">Return zero</button>
+          </div>
+        </div>
+
+        <div class="bottom-controls">
+          <button class="btn" id="connectBtn">01 · 连接设备</button>
+          <button class="btn primary" id="homeBtn" disabled>02 · 安全归零</button>
+          <button class="btn emergency" id="disableBtn">立即失能 / EMERGENCY DISABLE</button>
+        </div>
+      </section>
+
+      <aside class="reveal">
+        <div class="telemetry">
+          <div class="metric"><label>Position</label><strong class="acid" id="posValue">—</strong><small>rad</small></div>
+          <div class="metric"><label>Velocity</label><strong id="velValue">—</strong><small>rad/s</small></div>
+          <div class="metric"><label>Torque</label><strong id="torqueValue">—</strong><small>N·m</small></div>
+          <div class="metric"><label>Temperature</label><strong id="tempValue">—</strong><small>MOS / ROTOR °C</small></div>
+          <div class="metric"><label>Following error</label><strong id="errorValue">—</strong><small>rad</small></div>
+          <div class="metric"><label>Feedforward</label><strong id="tffValue">—</strong><small>N·m</small></div>
+        </div>
+
+        <div class="tuning">
+          <div class="section-label">Motion envelope / 安全运动参数</div>
+          <div class="range-row">
+            <div class="range-head"><span>MAX VELOCITY</span><output id="speedOut">0.40 rad/s</output></div>
+            <input id="speedRange" type="range" min="0.05" max="0.8" step="0.05" value="0.4">
+          </div>
+          <div class="range-row">
+            <div class="range-head"><span>MAX ACCELERATION</span><output id="accelOut">0.60 rad/s²</output></div>
+            <input id="accelRange" type="range" min="0.05" max="1.5" step="0.05" value="0.6">
+          </div>
+        </div>
+
+        <div class="message-panel">
+          <div class="section-label">System state / 系统状态</div>
+          <div class="system-message" id="systemMessage">关闭 DMTool，然后连接设备。连接不会自动使能电机。</div>
+          <div class="log" id="log"></div>
+        </div>
+      </aside>
+    </main>
+
+    <div class="safety-strip">
+      <b>Safety interlock</b>
+      <span>仅本机访问 · 前端心跳丢失 1 秒自动失能 · 目标角限制 ±3 rad · 超速 2 rad/s 自动失能</span>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const dial = $("dial");
+    const targetNeedle = $("targetNeedle");
+    const actualNeedle = $("actualNeedle");
+    const logEl = $("log");
+    let motorState = { mode: "disconnected", target: 0, angle_limit: 3 };
+    let dragging = false;
+    let pendingAngle = null;
+    let sendFrame = null;
+    let lastMessage = "";
+    let lastMode = "";
+
+    const format = (value, digits = 3) => Number.isFinite(value) ? value.toFixed(digits) : "—";
+    const degrees = (rad) => rad * 180 / Math.PI;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    function appendLog(text) {
+      const row = document.createElement("div");
+      row.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+      logEl.prepend(row);
+      while (logEl.children.length > 8) logEl.lastChild.remove();
+    }
+
+    async function post(path, payload = {}) {
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error((await response.json()).error || response.statusText);
+      } catch (error) {
+        appendLog(`请求失败：${error.message}`);
+      }
+    }
+
+    function queueTarget(angle) {
+      if (motorState.mode !== "tracking") return;
+      pendingAngle = clamp(angle, -motorState.angle_limit, motorState.angle_limit);
+      renderTarget(pendingAngle);
+      if (sendFrame) return;
+      sendFrame = requestAnimationFrame(() => {
+        post("/api/target", { angle: pendingAngle });
+        sendFrame = null;
+      });
+    }
+
+    function renderTarget(angle) {
+      targetNeedle.style.transform = `rotate(${degrees(angle)}deg)`;
+      $("hubAngle").textContent = format(angle);
+      dial.setAttribute("aria-valuenow", format(angle));
+    }
+
+    function angleFromPointer(event) {
+      const rect = dial.getBoundingClientRect();
+      const dx = event.clientX - (rect.left + rect.width / 2);
+      const dy = event.clientY - (rect.top + rect.height / 2);
+      return clamp(Math.atan2(dx, -dy), -motorState.angle_limit, motorState.angle_limit);
+    }
+
+    dial.addEventListener("pointerdown", (event) => {
+      if (motorState.mode !== "tracking") return;
+      dragging = true;
+      dial.setPointerCapture(event.pointerId);
+      queueTarget(angleFromPointer(event));
+    });
+    dial.addEventListener("pointermove", (event) => {
+      if (dragging) queueTarget(angleFromPointer(event));
+    });
+    dial.addEventListener("pointerup", () => dragging = false);
+    dial.addEventListener("pointercancel", () => dragging = false);
+    dial.addEventListener("keydown", (event) => {
+      if (motorState.mode !== "tracking") return;
+      const step = event.shiftKey ? 0.1 : 0.02;
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") queueTarget(motorState.target - step);
+      if (event.key === "ArrowRight" || event.key === "ArrowUp") queueTarget(motorState.target + step);
+    });
+
+    document.querySelectorAll(".preset").forEach((button) => {
+      button.addEventListener("click", () => queueTarget(Number(button.dataset.angle)));
+    });
+    $("connectBtn").addEventListener("click", () => post("/api/connect"));
+    $("homeBtn").addEventListener("click", () => post("/api/home"));
+    $("disableBtn").addEventListener("click", () => post("/api/disable"));
+
+    function updateConfig() {
+      const max_speed = Number($("speedRange").value);
+      const max_acceleration = Number($("accelRange").value);
+      $("speedOut").textContent = `${max_speed.toFixed(2)} rad/s`;
+      $("accelOut").textContent = `${max_acceleration.toFixed(2)} rad/s²`;
+      post("/api/config", { max_speed, max_acceleration });
+    }
+    $("speedRange").addEventListener("change", updateConfig);
+    $("accelRange").addEventListener("change", updateConfig);
+
+    function render(state) {
+      motorState = state;
+      const active = state.mode === "tracking";
+      const position = state.position;
+      const target = dragging && pendingAngle !== null ? pendingAngle : state.target;
+
+      $("statusPill").className = `status-pill ${state.mode}`;
+      $("statusText").textContent = state.mode.toUpperCase();
+      $("systemMessage").textContent = state.message;
+      dial.classList.toggle("locked", !active);
+      $("connectBtn").disabled = state.connected;
+      $("homeBtn").disabled = !state.connected || state.mode === "homing" || state.mode === "connecting";
+      document.querySelectorAll(".preset").forEach((el) => el.disabled = !active);
+
+      renderTarget(target || 0);
+      actualNeedle.style.transform = `rotate(${degrees(position || 0)}deg)`;
+      $("actualAngle").textContent = Number.isFinite(position) ? `${position.toFixed(3)} rad` : "—";
+      $("posValue").textContent = format(position, 4);
+      $("velValue").textContent = format(state.velocity, 3);
+      $("torqueValue").textContent = format(state.torque, 3);
+      $("tempValue").textContent = Number.isFinite(state.mos_temperature) ? `${state.mos_temperature} / ${state.rotor_temperature}` : "—";
+      $("errorValue").textContent = Number.isFinite(position) ? format((state.command_position || 0) - position, 4) : "—";
+      $("tffValue").textContent = format(state.integral_torque, 3);
+
+      if (state.mode !== lastMode || state.message !== lastMessage) {
+        appendLog(state.message);
+        lastMode = state.mode;
+        lastMessage = state.message;
+      }
+    }
+
+    async function poll() {
+      try {
+        const response = await fetch("/api/state", { cache: "no-store" });
+        if (!response.ok) throw new Error(response.statusText);
+        render(await response.json());
+      } catch (error) {
+        $("systemMessage").textContent = "本地控制服务连接中断";
+      }
+    }
+
+    setInterval(poll, 50);
+    setInterval(() => {
+      if (motorState.connected) post("/api/heartbeat");
+    }, 250);
+    window.addEventListener("beforeunload", () => {
+      navigator.sendBeacon("/api/disable", new Blob(["{}"], { type: "application/json" }));
+    });
+    poll();
+  </script>
+</body>
+</html>

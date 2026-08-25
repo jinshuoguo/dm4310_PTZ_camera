@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d0e">
+  <title>DM4310 云台相机</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e8ece9;
+      --muted: #89928e;
+      --panel: #15191a;
+      --panel-hi: #1c2222;
+      --line: #333b39;
+      --orange: #ff5c1a;
+      --orange-hi: #ff814f;
+      --cyan: #60efd0;
+      --red: #ff3f46;
+      --yellow: #ffd05c;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #0b0d0e;
+      color: var(--ink);
+      font-family: Bahnschrift, "DIN Alternate", "Microsoft YaHei UI", sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .16;
+      background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+
+    button, input { font: inherit; }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      width: 100vw;
+      height: 100dvh;
+      min-height: 0;
+      padding: calc(12px + var(--safe-top)) 14px calc(12px + var(--safe-bottom));
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+      gap: 10px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 43px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      letter-spacing: .09em;
+      white-space: nowrap;
+    }
+
+    .brand strong {
+      font-size: 18px;
+      font-weight: 750;
+    }
+
+    .brand strong i { color: var(--orange); font-style: normal; }
+    .brand span { color: var(--muted); font-size: 10px; letter-spacing: .18em; }
+
+    .link-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #444;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.03);
+      transition: .2s;
+      flex: 0 0 auto;
+    }
+
+    .link-status.online .pulse { background: var(--cyan); box-shadow: 0 0 14px rgba(96,239,208,.65); }
+    .link-status.fault .pulse { background: var(--red); box-shadow: 0 0 14px rgba(255,63,70,.55); }
+
+    .status-strip {
+      border: 1px solid var(--line);
+      background: rgba(21,25,26,.88);
+      min-height: 42px;
+      padding: 7px 10px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+    }
+
+    .mode-tag {
+      padding: 4px 8px;
+      border-left: 3px solid var(--muted);
+      background: #222727;
+      color: #b8bfbc;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .mode-tag.enabled { border-color: var(--cyan); color: var(--cyan); }
+    .mode-tag.fault { border-color: var(--red); color: var(--red); }
+    .mode-tag.enabling, .mode-tag.connecting { border-color: var(--yellow); color: var(--yellow); }
+
+    #message {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: #c6ccca;
+      font-size: 12px;
+    }
+
+    .deadman {
+      color: var(--muted);
+      font: 10px Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(220px, .9fr) minmax(280px, 1.5fr) minmax(210px, .85fr);
+      gap: 10px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, rgba(27,32,32,.97), rgba(15,18,19,.97));
+      min-height: 0;
+    }
+
+    .panel-title {
+      height: 34px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .panel-title b { color: var(--orange); font-weight: 700; }
+
+    .telemetry {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .motor-card {
+      padding: 13px 14px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+    }
+
+    .motor-card + .motor-card { border-top: 1px solid var(--line); }
+
+    .motor-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #c8cfcc;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+
+    .motor-head .id { color: var(--muted); font: 10px Consolas, monospace; }
+
+    .position {
+      align-self: center;
+      font: 700 clamp(30px, 5.2vw, 56px)/1 Bahnschrift, sans-serif;
+      letter-spacing: -.04em;
+      color: var(--ink);
+    }
+
+    .position small { font-size: 11px; color: var(--muted); letter-spacing: .1em; margin-left: 5px; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 8px;
+      font: 10px Consolas, monospace;
+      color: var(--muted);
+    }
+
+    .metrics span:nth-child(even) { color: #d7dcda; text-align: right; }
+
+    .joystick-panel {
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .axis-label {
+      position: absolute;
+      z-index: 2;
+      color: #69716e;
+      font: 9px Consolas, monospace;
+      letter-spacing: .16em;
+      pointer-events: none;
+    }
+
+    .axis-label.x { bottom: 10px; left: 50%; transform: translateX(-50%); }
+    .axis-label.y { left: 8px; top: 50%; transform: rotate(-90deg) translateX(-50%); transform-origin: left top; }
+
+    .joystick {
+      --jx: 0px;
+      --jy: 0px;
+      width: min(66vmin, 100% - 34px);
+      max-width: 390px;
+      aspect-ratio: 1;
+      position: relative;
+      border-radius: 50%;
+      border: 1px solid #46504d;
+      background:
+        radial-gradient(circle at center, transparent 0 7%, rgba(96,239,208,.08) 7.5% 8%, transparent 8.5%),
+        repeating-radial-gradient(circle at center, transparent 0 18px, rgba(255,255,255,.028) 19px 20px),
+        radial-gradient(circle, #1f2524 0, #111414 68%, #090b0c 100%);
+      box-shadow: inset 0 0 40px rgba(0,0,0,.65), 0 20px 45px rgba(0,0,0,.35);
+    }
+
+    .joystick::before,
+    .joystick::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      background: #39413f;
+    }
+
+    .joystick::before { width: 1px; height: 92%; left: 50%; top: 4%; }
+    .joystick::after { height: 1px; width: 92%; left: 4%; top: 50%; }
+
+    .tick {
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      border: 7px dashed rgba(255,255,255,.055);
+      pointer-events: none;
+    }
+
+    .knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 31%;
+      aspect-ratio: 1;
+      transform: translate(calc(-50% + var(--jx)), calc(-50% + var(--jy)));
+      border-radius: 50%;
+      border: 2px solid var(--orange);
+      background:
+        radial-gradient(circle at 38% 32%, #525a57, #222827 38%, #0d0f10 75%);
+      box-shadow:
+        0 0 0 6px rgba(255,92,26,.08),
+        0 13px 25px rgba(0,0,0,.55),
+        0 0 26px rgba(255,92,26,.18);
+      transition: transform 70ms linear, border-color .2s;
+      pointer-events: none;
+    }
+
+    .joystick.active .knob { transition: none; border-color: var(--orange-hi); }
+
+    .knob::after {
+      content: "";
+      position: absolute;
+      inset: 30%;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: 0 0 16px rgba(255,92,26,.8);
+    }
+
+    .velocity-readout {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 3px 8px;
+      padding: 7px 8px;
+      background: rgba(6,8,8,.76);
+      border-left: 2px solid var(--orange);
+      font: 10px Consolas, monospace;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .velocity-readout b { color: #fff; text-align: right; font-weight: 500; }
+
+    .settings {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .setting-block { padding: 14px 12px; border-bottom: 1px solid var(--line); }
+
+    .setting-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .setting-label output { color: var(--ink); font: 700 17px Bahnschrift, sans-serif; letter-spacing: 0; }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 16px 0 2px;
+      height: 4px;
+      border-radius: 0;
+      appearance: none;
+      background: linear-gradient(90deg, var(--orange) var(--fill, 50%), #39413f var(--fill, 50%));
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 22px;
+      height: 30px;
+      border: 1px solid #8b9591;
+      border-radius: 2px;
+      background: #252b2a;
+      box-shadow: 0 3px 8px #000;
+    }
+
+    .safety-copy {
+      align-self: end;
+      padding: 12px;
+      color: #747d79;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    .safety-copy b { color: var(--yellow); font-weight: 600; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(105px, .8fr) minmax(150px, 1.2fr) minmax(130px, 1fr);
+      gap: 9px;
+      min-height: 58px;
+    }
+
+    .function-dock {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(64px, 1fr));
+      gap: 6px;
+      min-height: 46px;
+    }
+
+    .function-btn {
+      position: relative;
+      min-width: 0;
+      min-height: 46px;
+      padding: 5px 3px;
+      border: 1px solid var(--line);
+      border-radius: 1px;
+      background: linear-gradient(#202625, #151919);
+      color: #aab2af;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .05em;
+      touch-action: manipulation;
+    }
+
+    .function-btn b {
+      display: block;
+      margin-bottom: 2px;
+      color: #66706c;
+      font: 9px Consolas, monospace;
+      font-weight: 500;
+    }
+
+    .function-btn:active { transform: translateY(1px); }
+    .function-btn:disabled { opacity: .33; }
+    .function-btn.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: linear-gradient(rgba(96,239,208,.13), rgba(96,239,208,.04));
+      box-shadow: inset 0 -2px var(--cyan);
+    }
+
+    .function-btn.recording {
+      border-color: var(--red);
+      color: #ffd5d7;
+      animation: recordPulse .8s ease-in-out infinite alternate;
+    }
+
+    @keyframes recordPulse {
+      to { background: rgba(255,63,70,.22); box-shadow: inset 0 -2px var(--red), 0 0 16px rgba(255,63,70,.22); }
+    }
+
+    .vision-overlay {
+      position: fixed;
+      z-index: 15;
+      inset: calc(9px + var(--safe-top)) 10px calc(78px + var(--safe-bottom));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      border: 1px solid #58635f;
+      background: rgba(7,9,9,.98);
+      box-shadow: 0 24px 70px rgba(0,0,0,.78);
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(.985);
+      transition: opacity .16s, transform .16s, visibility .16s;
+    }
+
+    .vision-overlay.show { opacity: 1; visibility: visible; transform: scale(1); }
+
+    .vision-head {
+      min-height: 43px;
+      padding: 0 11px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #151919;
+    }
+
+    .vision-title { font-size: 12px; letter-spacing: .13em; }
+    .vision-title i { color: var(--orange); font-style: normal; }
+    .vision-state { margin-left: auto; color: var(--muted); font: 10px Consolas, monospace; }
+
+    .icon-btn {
+      width: 34px;
+      height: 30px;
+      border: 1px solid var(--line);
+      background: #202525;
+      color: #d5dad8;
+    }
+
+    .feed-shell {
+      position: relative;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, transparent 49.9%, rgba(255,208,92,.24) 50%, transparent 50.1%),
+        linear-gradient(transparent 49.9%, rgba(255,208,92,.24) 50%, transparent 50.1%),
+        radial-gradient(circle at center, #17201e, #080a0a 68%);
+    }
+
+    #videoFeed {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+    }
+
+    .feed-placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #69726e;
+      font: 11px Consolas, monospace;
+      letter-spacing: .12em;
+      pointer-events: none;
+    }
+
+    #videoFeed[src]:not([src=""]) + .feed-placeholder { display: none; }
+
+    .vision-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 5px 8px;
+      border-left: 2px solid var(--yellow);
+      background: rgba(0,0,0,.68);
+      color: var(--yellow);
+      font: 10px Consolas, monospace;
+      letter-spacing: .08em;
+    }
+
+    .vision-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 7px;
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      background: #111515;
+    }
+
+    .vision-actions button { min-height: 42px; }
+
+    .control-btn {
+      position: relative;
+      min-height: 58px;
+      border: 1px solid #46504d;
+      border-radius: 2px;
+      background: #1c2121;
+      color: var(--ink);
+      overflow: hidden;
+      touch-action: manipulation;
+      letter-spacing: .08em;
+      font-weight: 700;
+    }
+
+    .control-btn:active { transform: translateY(1px); background: #252b2a; }
+    .control-btn:disabled { opacity: .38; }
+
+    .control-btn small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: .08em;
+    }
+
+    .arm-btn { border-color: #37675d; color: var(--cyan); }
+    .arm-btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: var(--hold, 0%);
+      background: rgba(96,239,208,.13);
+      border-right: 2px solid var(--cyan);
+      pointer-events: none;
+    }
+
+    .arm-btn > span { position: relative; z-index: 1; }
+
+    .stop-btn {
+      border-color: var(--red);
+      color: #fff;
+      background:
+        repeating-linear-gradient(-45deg, rgba(255,63,70,.08) 0 7px, transparent 7px 14px),
+        #291719;
+    }
+
+    .stop-btn::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 8px;
+      background: var(--red);
+      box-shadow: 0 0 12px rgba(255,63,70,.7);
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      bottom: calc(82px + var(--safe-bottom));
+      transform: translate(-50%, 16px);
+      max-width: calc(100vw - 30px);
+      padding: 10px 14px;
+      border: 1px solid var(--red);
+      background: rgba(32,12,14,.96);
+      color: #ffdadd;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 760px) and (orientation: portrait) {
+      .app {
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      .brand span, .deadman { display: none; }
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(220px, 1fr) auto;
+      }
+      .joystick-panel { grid-row: 1; }
+      .joystick { width: min(76vw, 45vh); }
+      .telemetry {
+        grid-row: 2;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr;
+      }
+      .motor-card { padding: 9px 11px; }
+      .motor-card + .motor-card { border-top: 0; border-left: 1px solid var(--line); }
+      .position { font-size: 28px; margin: 7px 0; }
+      .metrics span:nth-child(n+3) { display: none; }
+      .settings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+      }
+      .setting-block { border-bottom: 0; padding: 8px 12px; }
+      .safety-copy, .settings .panel-title { display: none; }
+      input[type="range"] { margin: 10px 0 1px; }
+      .controls { grid-template-columns: .75fr 1fr 1fr; }
+      .control-btn { min-height: 54px; font-size: 12px; }
+      .function-dock {
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(2, 38px);
+        min-height: 82px;
+        gap: 4px;
+      }
+      .function-btn { min-height: 38px; padding: 2px; font-size: 9px; }
+      .function-btn b { display: inline; margin-right: 3px; }
+      .vision-overlay { bottom: calc(66px + var(--safe-bottom)); }
+    }
+
+    @media (max-height: 650px) and (orientation: landscape) {
+      .app { gap: 7px; padding-top: calc(7px + var(--safe-top)); padding-bottom: calc(7px + var(--safe-bottom)); }
+      .topbar { min-height: 34px; }
+      .status-strip { min-height: 35px; padding-top: 4px; padding-bottom: 4px; }
+      .workspace { grid-template-columns: minmax(190px,.85fr) minmax(260px,1.3fr) minmax(180px,.75fr); gap: 7px; }
+      .motor-card { padding: 8px 11px; }
+      .position { font-size: clamp(28px, 6.4vh, 44px); }
+      .setting-block { padding: 9px 10px; }
+      input[type="range"] { margin: 10px 0 0; }
+      .controls, .control-btn { min-height: 49px; }
+      .function-dock, .function-btn { min-height: 38px; }
+      .function-btn { font-size: 9px; padding: 2px; }
+      .joystick { width: min(42vh, 100% - 34px); }
+      .safety-copy { font-size: 9px; padding: 8px 10px; }
+    }
+
+    /* LANDSCAPE COCKPIT V2 — 左操纵 / 中光学 / 右功能 */
+    .app {
+      height: 100dvh;
+      padding: calc(6px + var(--safe-top)) 7px calc(6px + var(--safe-bottom));
+      grid-template-rows: 42px minmax(0, 1fr);
+      gap: 6px;
+    }
+
+    .topbar {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      background: linear-gradient(90deg, #171b1b, #0f1212);
+    }
+
+    .brand strong { font-size: 16px; }
+    .brand span { font-size: 8px; }
+
+    .topbar .status-strip {
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      padding: 0;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      border: 0;
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      background: transparent;
+      clip-path: none;
+    }
+
+    .topbar .mode-tag { margin-left: 9px; }
+    .topbar #message { font-size: 10px; }
+    .topbar .deadman { margin-right: 9px; font-size: 8px; }
+
+    .workspace {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 28% 43% minmax(0, 29%);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 6px;
+    }
+
+    .left-console,
+    .right-console {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .left-console { grid-template-rows: minmax(0, 1fr) 82px; }
+    .right-console {
+      grid-template-rows: 20px auto minmax(0, 1fr) 48px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      background: linear-gradient(150deg, rgba(28,33,32,.98), rgba(12,15,15,.98));
+    }
+
+    .section-mark {
+      position: absolute;
+      top: 7px;
+      left: 8px;
+      z-index: 4;
+      color: #757e7a;
+      font: 8px Consolas, monospace;
+      letter-spacing: .13em;
+      pointer-events: none;
+    }
+
+    .section-mark span { color: var(--orange); margin-right: 6px; }
+    .right-console > .section-mark { position: static; align-self: center; }
+
+    .joystick-panel {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .joystick {
+      width: min(25vw, 54vh, calc(100% - 26px));
+      max-width: none;
+    }
+
+    .axis-label.x { bottom: 6px; }
+    .axis-label.y { left: 5px; }
+    .velocity-readout { right: 5px; bottom: 5px; padding: 4px 6px; font-size: 8px; }
+
+    .telemetry {
+      min-width: 0;
+      min-height: 0;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr;
+    }
+
+    .motor-card {
+      min-width: 0;
+      padding: 6px 7px;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .motor-card + .motor-card { border-top: 0; border-left: 1px solid var(--line); }
+    .motor-head { font-size: 8px; }
+    .motor-head .id { font-size: 7px; }
+    .position { align-self: auto; margin: 3px 0; font-size: clamp(16px, 2.2vw, 25px); }
+    .position small { font-size: 7px; }
+    .metrics { gap: 1px 5px; font-size: 7px; line-height: 1.1; }
+
+    .vision-overlay,
+    .vision-overlay.show {
+      position: relative;
+      z-index: 2;
+      inset: auto;
+      min-width: 0;
+      min-height: 0;
+      width: auto;
+      height: auto;
+      display: grid;
+      grid-template-rows: 38px minmax(0, 1fr);
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      transition: none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 14px 35px rgba(0,0,0,.35);
+    }
+
+    .vision-head { min-height: 0; padding: 0 8px; }
+    .vision-title { font-size: 9px; }
+    .vision-title i { margin-right: 4px; }
+    .vision-state { font-size: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .icon-btn { width: 30px; height: 25px; font-size: 10px; }
+    .vision-actions { display: none; }
+
+    .feed-shell::after {
+      content: "REC / LAN OPTICAL DATA";
+      position: absolute;
+      right: 8px;
+      bottom: 7px;
+      color: rgba(255,255,255,.45);
+      font: 7px Consolas, monospace;
+      letter-spacing: .12em;
+    }
+
+    .feed-placeholder { text-align: center; line-height: 1.7; font-size: 9px; }
+    .feed-placeholder small { color: #454c49; font-size: 7px; }
+    .vision-badge { top: 7px; left: 7px; padding: 4px 6px; font-size: 8px; }
+
+    .corner { position: absolute; width: 18px; height: 18px; border-color: rgba(96,239,208,.55); pointer-events: none; }
+    .corner-a { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
+    .corner-b { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; }
+    .corner-c { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; }
+    .corner-d { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; }
+
+    .function-dock {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(38px, 1fr));
+      gap: 4px;
+    }
+
+    .function-btn,
+    .function-dock .function-btn {
+      min-width: 0;
+      min-height: 38px;
+      padding: 3px 1px;
+      font-size: clamp(7px, 1vw, 9px);
+      line-height: 1.05;
+    }
+
+    .function-btn b { margin-bottom: 3px; font-size: 7px; }
+
+    .right-console .settings {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 22px minmax(0, 1fr) 17px;
+      border-color: #2a302e;
+    }
+
+    .right-console .panel-title { grid-column: 1 / -1; height: 22px; padding: 0 7px; font-size: 7px; }
+    .right-console .setting-block { min-width: 0; padding: 5px 7px; border-bottom: 0; }
+    .right-console .setting-block + .setting-block { border-left: 1px solid var(--line); }
+    .right-console .setting-label { font-size: 7px; }
+    .right-console .setting-label output { font-size: 12px; }
+    .right-console input[type="range"] { margin: 8px 0 0; }
+    .right-console input[type="range"]::-webkit-slider-thumb { width: 16px; height: 22px; }
+    .right-console .safety-copy {
+      grid-column: 1 / -1;
+      align-self: auto;
+      padding: 3px 7px;
+      border-top: 1px solid var(--line);
+      font-size: 7px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .right-console .controls {
+      min-width: 0;
+      min-height: 48px;
+      grid-template-columns: .8fr 1.15fr .85fr;
+      gap: 4px;
+    }
+
+    .right-console .control-btn {
+      min-width: 0;
+      min-height: 48px;
+      padding: 3px 1px;
+      font-size: 8px;
+    }
+
+    .right-console .control-btn small { font-size: 6px; }
+
+    .rotate-notice { display: none; }
+
+    @media (orientation: portrait) {
+      .app { filter: blur(8px); pointer-events: none; }
+      .rotate-notice {
+        position: fixed;
+        z-index: 100;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 12px;
+        background: rgba(7,9,9,.93);
+        color: var(--ink);
+        letter-spacing: .12em;
+      }
+      .rotate-notice span { color: var(--orange); font-size: 54px; animation: rotateHint 1.8s ease-in-out infinite; }
+      .rotate-notice strong { font-size: 18px; }
+      .rotate-notice small { color: var(--muted); font: 9px Consolas, monospace; }
+      @keyframes rotateHint { 50% { transform: rotate(90deg); } }
+    }
+
+    @media (orientation: landscape) and (max-height: 430px) {
+      .app { grid-template-rows: 36px minmax(0, 1fr); padding-top: calc(4px + var(--safe-top)); padding-bottom: calc(4px + var(--safe-bottom)); }
+      .topbar { min-height: 0; }
+      .brand span, .deadman { display: none; }
+      .left-console { grid-template-rows: minmax(0, 1fr) 72px; }
+      .joystick { width: min(24vw, 50vh, calc(100% - 20px)); }
+      .right-console { padding: 5px; grid-template-rows: 16px auto minmax(0, 1fr) 42px; gap: 4px; }
+      .function-dock { grid-template-rows: repeat(2, 34px); }
+      .function-btn, .function-dock .function-btn { min-height: 34px; }
+      .right-console .controls, .right-console .control-btn { min-height: 42px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand"><strong>DM4310<i>//</i>云台相机</strong><span>DUAL AXIS / LAN</span></div>
+      <section class="status-strip" aria-live="polite">
+        <span class="mode-tag" id="modeTag">OFFLINE</span>
+        <span id="message">正在连接本机控制服务…</span>
+        <span class="deadman">WATCHDOG 250ms / 1.2s</span>
+      </section>
+      <div class="link-status" id="linkStatus"><span class="pulse"></span><span id="linkText">LINKING</span></div>
+    </header>
+
+    <section class="workspace">
+      <section class="left-console">
+        <section class="panel joystick-panel" id="joystickPanel" aria-label="双轴虚拟摇杆">
+          <div class="section-mark"><span>01</span>MANUAL VECTOR</div>
+          <span class="axis-label y">M2 / PITCH</span>
+          <span class="axis-label x">M1 / PAN</span>
+          <div class="joystick" id="joystick">
+            <span class="tick"></span>
+            <span class="knob"></span>
+          </div>
+          <div class="velocity-readout">
+            <span>M1</span><b id="cmdX">+0.00</b>
+            <span>M2</span><b id="cmdY">+0.00</b>
+          </div>
+        </section>
+
+        <section class="panel telemetry" aria-label="电机遥测">
+          <article class="motor-card">
+            <div class="motor-head"><span>M1 PAN</span><span class="id">01→11</span></div>
+            <div class="position"><span id="m1Position">—</span><small>RAD</small></div>
+            <div class="metrics">
+              <span>VEL</span><span id="m1Velocity">—</span>
+              <span>TRQ</span><span id="m1Torque">—</span>
+              <span>CMD</span><span id="m1Command">—</span>
+            </div>
+          </article>
+          <article class="motor-card">
+            <div class="motor-head"><span>M2 TILT</span><span class="id">02→12</span></div>
+            <div class="position"><span id="m2Position">—</span><small>RAD</small></div>
+            <div class="metrics">
+              <span>VEL</span><span id="m2Velocity">—</span>
+              <span>TRQ</span><span id="m2Torque">—</span>
+              <span>CMD</span><span id="m2Command">—</span>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section class="vision-overlay show" id="visionOverlay" aria-label="摄像头回传">
+        <header class="vision-head">
+          <span class="vision-title"><i>02</i> / OPTICAL UPLINK</span>
+          <span class="vision-state" id="visionState">CAMERA STANDBY</span>
+          <button class="icon-btn" id="visionClose" aria-label="停止手机视频流">▮</button>
+        </header>
+        <div class="feed-shell">
+          <img id="videoFeed" alt="摄像头实时回传画面">
+          <span class="feed-placeholder">NO VIDEO SIGNAL<br><small>PRESS CAM TO INITIALIZE</small></span>
+          <span class="vision-badge" id="visionBadge">LIVE PREVIEW</span>
+          <span class="corner corner-a"></span><span class="corner corner-b"></span>
+          <span class="corner corner-c"></span><span class="corner corner-d"></span>
+        </div>
+        <footer class="vision-actions">
+          <button class="function-btn" id="visionFace" disabled>人脸跟随</button>
+          <button class="function-btn" id="visionHand" disabled>手部跟随</button>
+          <button class="function-btn" id="visionCancel" disabled>停止跟随</button>
+        </footer>
+      </section>
+
+      <aside class="right-console">
+        <div class="section-mark"><span>03</span>FUNCTION MATRIX</div>
+        <section class="function-dock" aria-label="扩展功能">
+          <button class="function-btn" id="cameraBtn"><b>CAM</b>画面</button>
+          <button class="function-btn" id="faceBtn" disabled><b>FACE</b>人脸</button>
+          <button class="function-btn" id="handBtn" disabled><b>HAND</b>手部</button>
+          <button class="function-btn" id="cancelBtn" disabled><b>BREAK</b>取消</button>
+          <button class="function-btn" id="saveBtn" disabled><b>POS+</b>记录</button>
+          <button class="function-btn" id="returnBtn" disabled><b>POS↩</b>返回</button>
+          <button class="function-btn" id="recordBtn" disabled><b>REC</b>录制</button>
+          <button class="function-btn" id="replayBtn" disabled><b>PLAY</b>复现</button>
+        </section>
+
+        <section class="panel settings">
+          <div class="panel-title"><span>Motion profile</span><b>LIVE</b></div>
+          <label class="setting-block">
+            <span class="setting-label"><span>最高速度</span><output id="speedValue">3.0</output></span>
+            <input id="speedSlider" type="range" min="0.5" max="5" step="0.1" value="3">
+          </label>
+          <label class="setting-block">
+            <span class="setting-label"><span>响应时间</span><output id="rampValue">0.20s</output></span>
+            <input id="rampSlider" type="range" min="0.08" max="1" step="0.02" value="0.20">
+          </label>
+          <div class="safety-copy"><b>±3 RAD</b> SOFT LIMIT / AUTO DEADMAN</div>
+        </section>
+
+        <section class="controls">
+          <button class="control-btn" id="connectBtn">连接<small>CAN</small></button>
+          <button class="control-btn arm-btn" id="armBtn" disabled><span>长按使能<small>1 SEC</small></span></button>
+          <button class="control-btn stop-btn" id="stopBtn">急停</button>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <div class="rotate-notice"><span>↻</span><strong>请将手机横屏</strong><small>LANDSCAPE CONTROL DECK</small></div>
+
+  <div class="toast" id="toast" role="alert"></div>
+
+  <script>
+    (() => {
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const params = new URLSearchParams(location.search);
+      const token = params.get("token") || sessionStorage.getItem("dm-control-token") || "";
+      if (token) sessionStorage.setItem("dm-control-token", token);
+
+      const ui = {
+        link: $("linkStatus"), linkText: $("linkText"), mode: $("modeTag"), message: $("message"),
+        connect: $("connectBtn"), arm: $("armBtn"), stop: $("stopBtn"), toast: $("toast"),
+        stick: $("joystick"), stickPanel: $("joystickPanel"), cmdX: $("cmdX"), cmdY: $("cmdY"),
+        speed: $("speedSlider"), speedValue: $("speedValue"), ramp: $("rampSlider"), rampValue: $("rampValue"),
+        m1p: $("m1Position"), m1v: $("m1Velocity"), m1t: $("m1Torque"), m1c: $("m1Command"),
+        m2p: $("m2Position"), m2v: $("m2Velocity"), m2t: $("m2Torque"), m2c: $("m2Command"),
+        camera: $("cameraBtn"), face: $("faceBtn"), hand: $("handBtn"), save: $("saveBtn"),
+        returnPosition: $("returnBtn"), record: $("recordBtn"), replay: $("replayBtn"), cancel: $("cancelBtn"),
+        visionOverlay: $("visionOverlay"), visionClose: $("visionClose"), video: $("videoFeed"),
+        visionState: $("visionState"), visionBadge: $("visionBadge"),
+        visionFace: $("visionFace"), visionHand: $("visionHand"), visionCancel: $("visionCancel")
+      };
+
+      let state = { connected: false, enabled: false, mode: "offline" };
+      let stick = { x: 0, y: 0 };
+      let activePointer = null;
+      let holdTimer = null;
+      let holdStarted = 0;
+      let holdAnimation = null;
+      let toastTimer = null;
+      let stateFailures = 0;
+      let configTimer = null;
+
+      function showToast(message) {
+        ui.toast.textContent = message;
+        ui.toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => ui.toast.classList.remove("show"), 2600);
+      }
+
+      async function api(action, payload = {}, keepalive = false) {
+        if (!token) throw new Error("地址缺少控制码，请重新扫描/输入终端显示的完整地址");
+        const response = await fetch("/api/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Control-Token": token },
+          body: JSON.stringify({ action, ...payload }),
+          cache: "no-store",
+          keepalive
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        return result;
+      }
+
+      function fmt(value, digits = 3, suffix = "") {
+        return Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(digits)}${suffix}` : "—";
+      }
+
+      function render(next) {
+        state = next;
+        const online = true;
+        const fault = next.mode === "fault";
+        ui.link.classList.toggle("online", online && !fault);
+        ui.link.classList.toggle("fault", fault);
+        ui.linkText.textContent = fault ? "FAULT" : "LAN ONLINE";
+        const displayMode = next.enabled && next.operation !== "manual" ? next.operation : next.mode;
+        ui.mode.textContent = String(displayMode || "unknown").replace("replay_return", "replay home").toUpperCase();
+        ui.mode.className = `mode-tag ${next.mode || ""}`;
+        ui.message.textContent = next.message || "—";
+        ui.connect.disabled = Boolean(next.connected);
+        ui.connect.innerHTML = next.connected ? "设备已连接<small>USB2FDCAN / CAN 1M</small>" : "连接设备<small>USB2FDCAN</small>";
+        ui.arm.disabled = !next.connected || next.enabled || ["connecting", "enabling"].includes(next.mode);
+
+        const enabled = Boolean(next.enabled);
+        const operation = next.operation || "manual";
+        [ui.face, ui.hand, ui.save, ui.record, ui.visionFace, ui.visionHand].forEach((button) => button.disabled = !enabled);
+        ui.returnPosition.disabled = !enabled || !next.can_return || next.recording;
+        ui.replay.disabled = !enabled || !next.can_replay || next.recording;
+        ui.cancel.disabled = !enabled || operation === "manual";
+        ui.visionCancel.disabled = ui.cancel.disabled;
+        ui.camera.classList.toggle("active", Boolean(next.camera_running));
+        ui.face.classList.toggle("active", operation === "face");
+        ui.hand.classList.toggle("active", operation === "hand");
+        ui.visionFace.classList.toggle("active", operation === "face");
+        ui.visionHand.classList.toggle("active", operation === "hand");
+        ui.record.classList.toggle("recording", Boolean(next.recording));
+        ui.record.innerHTML = next.recording
+          ? `<b>REC</b>停止录制 ${Number(next.recorded_duration || 0).toFixed(1)}s`
+          : `<b>←</b>动作录制`;
+        ui.replay.innerHTML = `<b>→</b>动作复现${next.can_replay ? ` ${Number(next.recorded_duration || 0).toFixed(1)}s` : ""}`;
+        ui.visionState.textContent = next.vision_error
+          ? `ERROR / ${next.vision_error}`
+          : next.camera_running
+          ? `LIVE / ${next.target_detected ? "TARGET LOCK" : "SEARCHING"}`
+          : "CAMERA STANDBY";
+        ui.visionBadge.textContent = operation === "face"
+          ? "FACE TRACKING"
+          : operation === "hand"
+          ? "HAND TRACKING"
+          : "LIVE PREVIEW";
+        if (ui.visionOverlay.classList.contains("show") && next.camera_running) ensureVideo();
+
+        if (document.activeElement !== ui.speed) {
+          ui.speed.value = String(next.max_speed ?? ui.speed.value);
+          setRangeFill(ui.speed);
+        }
+        if (document.activeElement !== ui.ramp) {
+          ui.ramp.value = String(next.ramp_time ?? ui.ramp.value);
+          setRangeFill(ui.ramp);
+        }
+        ui.speedValue.textContent = Number(ui.speed.value).toFixed(1);
+        ui.rampValue.textContent = `${Number(ui.ramp.value).toFixed(2)}s`;
+
+        const m1 = next.motors?.[0] || {};
+        const m2 = next.motors?.[1] || {};
+        ui.m1p.textContent = fmt(m1.position, 3);
+        ui.m1v.textContent = fmt(m1.velocity, 2, " rad/s");
+        ui.m1t.textContent = fmt(m1.torque, 2, " N·m");
+        ui.m1c.textContent = fmt(m1.command_velocity, 2, " rad/s");
+        ui.m2p.textContent = fmt(m2.position, 3);
+        ui.m2v.textContent = fmt(m2.velocity, 2, " rad/s");
+        ui.m2t.textContent = fmt(m2.torque, 2, " N·m");
+        ui.m2c.textContent = fmt(m2.command_velocity, 2, " rad/s");
+      }
+
+      function renderOffline(message) {
+        state = { connected: false, enabled: false, mode: "offline" };
+        ui.link.classList.remove("online", "fault");
+        ui.linkText.textContent = "OFFLINE";
+        ui.mode.textContent = "OFFLINE";
+        ui.mode.className = "mode-tag fault";
+        ui.message.textContent = message;
+        ui.arm.disabled = true;
+        [ui.face, ui.hand, ui.save, ui.returnPosition, ui.record, ui.replay, ui.cancel,
+          ui.visionFace, ui.visionHand, ui.visionCancel].forEach((button) => button.disabled = true);
+      }
+
+      async function pollState() {
+        if (!token) {
+          renderOffline("地址缺少控制码，请使用终端输出的完整网址");
+          return;
+        }
+        try {
+          const response = await fetch(`/api/state?token=${encodeURIComponent(token)}`, { cache: "no-store" });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+          stateFailures = 0;
+          render(result);
+        } catch (error) {
+          stateFailures += 1;
+          if (stateFailures >= 2) renderOffline(`控制服务不可达：${error.message}`);
+        }
+      }
+
+      function setRangeFill(input) {
+        const value = (Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min)) * 100;
+        input.style.setProperty("--fill", `${value}%`);
+      }
+
+      function queueConfig() {
+        setRangeFill(ui.speed);
+        setRangeFill(ui.ramp);
+        ui.speedValue.textContent = Number(ui.speed.value).toFixed(1);
+        ui.rampValue.textContent = `${Number(ui.ramp.value).toFixed(2)}s`;
+        clearTimeout(configTimer);
+        configTimer = setTimeout(() => {
+          api("config", { max_speed: Number(ui.speed.value), ramp_time: Number(ui.ramp.value) })
+            .catch((error) => showToast(error.message));
+        }, 120);
+      }
+
+      function setStick(x, y, visual = true) {
+        const magnitude = Math.hypot(x, y);
+        if (magnitude > 1) { x /= magnitude; y /= magnitude; }
+        const deadzone = 0.045;
+        if (Math.hypot(x, y) < deadzone) x = y = 0;
+
+        // 主轴锁定：明显水平或垂直推动时消除另一个方向的手指误差。
+        if (Math.abs(x) > Math.abs(y) * 1.75) y = 0;
+        else if (Math.abs(y) > Math.abs(x) * 1.75) x = 0;
+
+        stick.x = Math.max(-1, Math.min(1, x));
+        stick.y = Math.max(-1, Math.min(1, y));
+        if (visual) {
+          const radius = ui.stick.clientWidth * 0.335;
+          ui.stick.style.setProperty("--jx", `${stick.x * radius}px`);
+          ui.stick.style.setProperty("--jy", `${-stick.y * radius}px`);
+        }
+        const speed = Number(ui.speed.value);
+        ui.cmdX.textContent = fmt(stick.x * speed * 0.6, 2);
+        ui.cmdY.textContent = fmt(stick.y * speed, 2);
+      }
+
+      function updateStickFromPointer(event) {
+        const rect = ui.stick.getBoundingClientRect();
+        const radius = rect.width * 0.335;
+        const x = (event.clientX - (rect.left + rect.width / 2)) / radius;
+        const y = -((event.clientY - (rect.top + rect.height / 2)) / radius);
+        setStick(x, y);
+      }
+
+      function releaseStick() {
+        if (activePointer !== null) {
+          try { ui.stickPanel.releasePointerCapture(activePointer); } catch (_) {}
+        }
+        activePointer = null;
+        ui.stick.classList.remove("active");
+        setStick(0, 0);
+        if (state.enabled) api("command", { x: 0, y: 0 }, true).catch(() => {});
+      }
+
+      ui.stickPanel.addEventListener("pointerdown", (event) => {
+        if (!state.enabled || activePointer !== null) {
+          if (!state.enabled) showToast("请先连接设备并长按使能");
+          return;
+        }
+        activePointer = event.pointerId;
+        ui.stickPanel.setPointerCapture(activePointer);
+        ui.stick.classList.add("active");
+        updateStickFromPointer(event);
+        navigator.vibrate?.(8);
+      });
+      ui.stickPanel.addEventListener("pointermove", (event) => {
+        if (event.pointerId === activePointer) updateStickFromPointer(event);
+      });
+      ui.stickPanel.addEventListener("pointerup", (event) => { if (event.pointerId === activePointer) releaseStick(); });
+      ui.stickPanel.addEventListener("pointercancel", (event) => { if (event.pointerId === activePointer) releaseStick(); });
+
+      ui.connect.addEventListener("click", () => {
+        api("connect").catch((error) => showToast(error.message));
+        navigator.vibrate?.(15);
+      });
+
+      function ensureVideo() {
+        if (!ui.video.getAttribute("src")) {
+          ui.video.src = `/api/video?token=${encodeURIComponent(token)}&t=${Date.now()}`;
+        }
+      }
+
+      function openVision(startCamera = false) {
+        ui.visionOverlay.classList.add("show");
+        if (state.camera_running) ensureVideo();
+        else if (startCamera) {
+          api("camera").then(() => setTimeout(ensureVideo, 250)).catch((error) => showToast(error.message));
+        }
+      }
+
+      function closeVision() {
+        ui.visionOverlay.classList.remove("show");
+        // 关闭手机端视频连接以节省带宽；电脑端检测线程继续运行。
+        ui.video.removeAttribute("src");
+      }
+
+      function actionButton(action, openCamera = false) {
+        releaseStick();
+        api(action).then(() => {
+          if (openCamera) openVision(false);
+        }).catch((error) => showToast(error.message));
+        navigator.vibrate?.(18);
+      }
+
+      ui.camera.addEventListener("click", () => openVision(!state.camera_running));
+      ui.visionClose.addEventListener("click", closeVision);
+      ui.face.addEventListener("click", () => actionButton("face", true));
+      ui.hand.addEventListener("click", () => actionButton("hand", true));
+      ui.visionFace.addEventListener("click", () => actionButton("face", true));
+      ui.visionHand.addEventListener("click", () => actionButton("hand", true));
+      ui.save.addEventListener("click", () => actionButton("save_position"));
+      ui.returnPosition.addEventListener("click", () => actionButton("return_position"));
+      ui.record.addEventListener("click", () => actionButton("record"));
+      ui.replay.addEventListener("click", () => actionButton("replay"));
+      ui.cancel.addEventListener("click", () => actionButton("cancel"));
+      ui.visionCancel.addEventListener("click", () => actionButton("cancel"));
+
+      function cancelArmHold() {
+        clearTimeout(holdTimer);
+        cancelAnimationFrame(holdAnimation);
+        holdTimer = null;
+        ui.arm.style.setProperty("--hold", "0%");
+      }
+
+      function animateHold() {
+        if (!holdTimer) return;
+        const progress = Math.min(100, (performance.now() - holdStarted) / 10);
+        ui.arm.style.setProperty("--hold", `${progress}%`);
+        holdAnimation = requestAnimationFrame(animateHold);
+      }
+
+      ui.arm.addEventListener("pointerdown", (event) => {
+        if (ui.arm.disabled) return;
+        if (Math.hypot(stick.x, stick.y) > 0.05) {
+          showToast("使能前请将摇杆回中");
+          return;
+        }
+        event.preventDefault();
+        holdStarted = performance.now();
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          ui.arm.style.setProperty("--hold", "100%");
+          api("enable").catch((error) => showToast(error.message));
+          navigator.vibrate?.([35, 30, 60]);
+          setTimeout(cancelArmHold, 250);
+        }, 1000);
+        animateHold();
+      });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((name) => ui.arm.addEventListener(name, cancelArmHold));
+
+      ui.stop.addEventListener("click", () => {
+        releaseStick();
+        api("disable", {}, true).catch((error) => showToast(error.message));
+        navigator.vibrate?.([60, 40, 60]);
+      });
+
+      ui.speed.addEventListener("input", queueConfig);
+      ui.ramp.addEventListener("input", queueConfig);
+
+      setInterval(() => {
+        if (state.enabled) api("command", { x: stick.x, y: stick.y }).catch(() => {});
+      }, 50);
+      setInterval(pollState, 180);
+
+      function sendFinalZero() {
+        setStick(0, 0);
+        if (!token) return;
+        const data = new Blob([JSON.stringify({ action: "command", x: 0, y: 0 })], { type: "application/json" });
+        navigator.sendBeacon?.(`/api/action?token=${encodeURIComponent(token)}`, data);
+      }
+      document.addEventListener("visibilitychange", () => { if (document.hidden) { releaseStick(); sendFinalZero(); } });
+      window.addEventListener("blur", releaseStick);
+      window.addEventListener("pagehide", sendFinalZero);
+      window.addEventListener("contextmenu", (event) => event.preventDefault());
+
+      setRangeFill(ui.speed);
+      setRangeFill(ui.ramp);
+      setStick(0, 0);
+      pollState();
+    })();
+  </script>
+</body>
+</html>

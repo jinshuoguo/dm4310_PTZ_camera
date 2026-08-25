@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and local runtime data
+*.log
+*.tmp
+*.bak
+
+# SolidWorks temporary lock files
+~$*
+
+# Vendor installers are downloadable separately and should not be versioned
+DMTool-*.exe
+USB2CAN_*.exe
