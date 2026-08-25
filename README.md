@@ -37,21 +37,77 @@
 - **高精度归零**：限速、限加速度接近零点，使用捕获区与积分前馈补偿静摩擦。
 - **安全保护**：急停、软限位、超速、反馈错误、相机丢失、手柄断开和网络断联保护。
 
-## 演示视频
+## 动态演示
 
-GitHub README 无法稳定内嵌仓库内的 MP4，点击下表中的链接可直接查看原始演示。
+GIF 会在 GitHub 页面中自动循环播放。每张动图均匀采样了对应演示的完整过程；
+点击“高清原片”可以查看或下载 MP4 版本。
 
-| 阶段 | 演示 | 说明 |
-| --- | --- | --- |
-| 01 | [达妙官方调试软件驱动电机](./达妙官方调试软件驱动电机.mp4) | 核对电机参数、CAN ID 与通信链路 |
-| 02 | [Python 驱动电机](./python驱动电机.mp4) | 通过 USB2FDCAN SDK 完成使能、控制与反馈解析 |
-| 03 | [Python 键盘控制单电机](./基于python键盘控制电机.mp4) | 按键速度控制与快速平滑启停 |
-| 04 | [Python 键盘控制双电机](./基于python键盘控制双电机.mp4) | 两个方向键组独立控制云台双轴 |
-| 05 | [一台电机示教另一台电机](./一个电机控制另一个电机.mp4) | 拖动示教与相对角度跟随 |
-| 06 | [Xbox 手柄控制云台](./xbox手柄控制云台.mp4) | 摇杆幅度映射目标速度 |
-| 07 | [人脸自动跟随](./人脸跟随.mp4) | 人脸中心偏差驱动双轴闭环跟随 |
-| 08 | [手部自动跟踪](./手部自动跟踪.mp4) | 使用手部关键点控制云台视线 |
-| 09 | [局域网设备控制云台](./局域网设备控制云台.mp4) | 手机横屏控制、状态显示与相机画面回传 |
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/01_dmtool.gif" alt="达妙官方工具驱动电机" width="100%"><br>
+      <b>01 · 官方工具打通硬件链路</b><br>
+      <sub>核对电机参数、CAN ID 与通信状态</sub><br>
+      <a href="./达妙官方调试软件驱动电机.mp4">高清原片</a>
+    </td>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/02_python_motor.gif" alt="Python 驱动电机" width="100%"><br>
+      <b>02 · Python 驱动单电机</b><br>
+      <sub>USB2FDCAN 使能、控制与反馈解析</sub><br>
+      <a href="./python驱动电机.mp4">高清原片</a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/03_keyboard_single.gif" alt="键盘控制单电机" width="100%"><br>
+      <b>03 · 键盘控制单电机</b><br>
+      <sub>速度控制与 0.1 秒快速平滑启停</sub><br>
+      <a href="./基于python键盘控制电机.mp4">高清原片</a>
+    </td>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/04_keyboard_dual.gif" alt="键盘控制双电机" width="100%"><br>
+      <b>04 · 键盘控制双电机</b><br>
+      <sub>两组方向键独立控制水平与俯仰轴</sub><br>
+      <a href="./基于python键盘控制双电机.mp4">高清原片</a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/05_teach_follow.gif" alt="双电机拖动示教" width="100%"><br>
+      <b>05 · 双电机拖动示教</b><br>
+      <sub>手动拖动一台电机，另一台同步跟随</sub><br>
+      <a href="./一个电机控制另一个电机.mp4">高清原片</a>
+    </td>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/06_xbox_gamepad.gif" alt="Xbox 手柄控制云台" width="100%"><br>
+      <b>06 · Xbox 手柄遥控</b><br>
+      <sub>摇杆方向和幅度映射双轴目标速度</sub><br>
+      <a href="./xbox手柄控制云台.mp4">高清原片</a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/07_face_tracking.gif" alt="人脸自动跟随" width="100%"><br>
+      <b>07 · 人脸自动跟随</b><br>
+      <sub>根据人脸中心偏差驱动双轴闭环</sub><br>
+      <a href="./人脸跟随.mp4">高清原片</a>
+    </td>
+    <td width="50%" align="center">
+      <img src="./assets/gifs/08_hand_tracking.gif" alt="手部自动跟随" width="100%"><br>
+      <b>08 · 手部自动跟随</b><br>
+      <sub>使用掌心关键点控制云台视线</sub><br>
+      <a href="./手部自动跟踪.mp4">高清原片</a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="./assets/gifs/09_mobile_control.gif" alt="手机局域网控制云台" width="50%"><br>
+      <b>09 · 手机局域网控制台</b><br>
+      <sub>横屏摇杆、状态遥测、自动功能与实时画面回传</sub><br>
+      <a href="./局域网设备控制云台.mp4">高清原片</a>
+    </td>
+  </tr>
+</table>
 
 ## 系统架构
 
@@ -207,6 +263,8 @@ python dm4310_mobile.py
 ├─ README.md                         # GitHub 项目主页
 ├─ 成品图.jpg                        # 实物展示
 ├─ *.mp4                            # 功能演示视频
+├─ assets/gifs/                     # README 轻量循环动图
+├─ tools/make_readme_gifs.py        # MP4 批量生成 GIF 预览工具
 ├─ *.SLDPRT / *.SLDASM / *.STEP     # 机械设计源文件与通用模型
 └─ dm4310_python/
    ├─ dm4310_usb2fdcan.py           # 单电机通信与低速测试
